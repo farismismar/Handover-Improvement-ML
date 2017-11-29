@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Mon Jul 3 16:20:05 2017
-
 @author: farismismar
 """
 
@@ -160,8 +159,8 @@ def predict_handover(UE_i_RSRP_LTE, UE_i_RSRP_5G, UE_i_HO, i):
     #classifier.get_params().keys().
     
     # Hyperparameters
-    alphas = np.linspace(0,1,5)
-    lambdas = np.linspace(0,1,5)
+    alphas = np.linspace(0,1,3)
+    lambdas = np.linspace(0,1,3)
     depths = [6,8]
     sample_weights = [0.5, 0.7]
     child_weights = [0, 1, 10]
@@ -341,4 +340,3 @@ file.write('Original HO success rate = {:.6f}%'.format(100*simulation_result['Or
 file.write('Proposed HO success rate = {:.6f}%'.format(100*simulation_result['Proposed'].sum()/simulation_result['Attempted'].sum()))
 
 file.close()
-
