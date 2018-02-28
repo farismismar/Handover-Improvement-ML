@@ -2,19 +2,16 @@
 # -*- coding: utf-8 -*-
 """
 Created on Mon Jul 3 16:20:05 2017
+
 @author: farismismar
 """
 
-#from __future__ import print_function # uncomment if using Python 2.
 import numpy as np
 import pandas as pd
 
-import matplotlib
-matplotlib.use('Agg')
-
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from matplotlib import rc
+#from matplotlib import rc
 from numpy import linalg as LA
 
 import xgboost as xgb
@@ -39,15 +36,16 @@ NRB = 100
 # r  the radius of the circle
 r = 350 # in meters
 lamb = 2e-4 #rate for PPP intensity parameter
-r_training = 0.7 # do a 70-30 split
+r_training = 0.7 
 
 Lambda = lamb * np.pi * r ** 2 # the mean of the Poisson random variable n
 n = np.random.poisson(Lambda) # the Poisson random variable (i.e., the number of points inside C)
 
 max_sim_time = 40 # in milliseconds, T_sim
 
-k = 5 # 5-fold cross validation
+k = 5 # 5-fold cross validationl
 
+# Now shadowing used here
 def cost231(distance, f=2.1e3, h_R=1.5, h_B=20):
     C = 3
     a = (1.1 * np.log10(f) - 0.7)*h_R - (1.56*np.log10(f) - 0.8)
@@ -57,7 +55,7 @@ def cost231(distance, f=2.1e3, h_R=1.5, h_B=20):
 
     return L
 
-# From Path Loss Models for 5G Millimeter Wave Propagation Channels in Urban Microcells, 2013.
+# From Path Loss Models for Millimeter-wave  distance-dependent large-scale propagation measurements and path loss models for outdoor and indoor 5G systems},'' April 2016.
 def pathloss_5g(distance, f=28e3, h_R=1.5, h_B=23):
     # These are the parameters for f = 28000 MHz.
     alpha = 118.77
@@ -70,6 +68,7 @@ def pathloss_5g(distance, f=28e3, h_R=1.5, h_B=23):
         L.append(alpha + beta * np.log10(d * 1000) + chi_sigma) # distance is in meters here.
 
     return L
+
 
 def plot_network(u_1, u_2, plotting=False):
     
@@ -89,12 +88,12 @@ def plot_network(u_1, u_2, plotting=False):
         y[i] = radii[i] * np.sin(angle[i])
     
     if (plotting):
-        fig = plt.figure(figsize=(5,5))
+        plt.figure(figsize=(5,5))
         plt.rc('text', usetex=True)
         plt.rc('font', family='serif')
 
-        plt.plot(x,y,'bo')
-        plt.plot(0, 0, 'ro')
+        plt.plot(x,y,'bo', markersize=1.5)
+        plt.plot(0, 0, '^r')
         plt.grid(True)
         
         plt.title(r'\textbf{Base station and UE positions}')
@@ -109,7 +108,8 @@ def plot_network(u_1, u_2, plotting=False):
         plt.ylim(-r, r)
     
         plt.savefig('figures/network.pdf', format='pdf')
-        plt.close(fig)
+        plt.show()
+    
     return ([x,y])
 
 def plot_roc(y_test, y_score, i):
@@ -120,7 +120,7 @@ def plot_roc(y_test, y_score, i):
     fpr, tpr, _ = roc_curve(y_test, y_score)
     roc_auc = auc(fpr, tpr)
     
-    fig = plt.figure(figsize=(7,6))
+    plt.figure(figsize=(7,6))
     lw = 2
     
     plt.plot(fpr, tpr,
@@ -137,7 +137,6 @@ def plot_roc(y_test, y_score, i):
     plt.title(r'\textbf{Receiver Operating Characteristic -- UE \#' + '{0}'.format(i) + '}')
     plt.legend(loc="lower right")
     plt.savefig('figures/roc_{0}.pdf'.format(i), format='pdf')
-    plt.close(fig)
 
 def predict_handover(UE_i_RSRP_LTE, UE_i_RSRP_5G, UE_i_HO, i):
     dataset = pd.DataFrame({'RSRP_LTE': UE_i_RSRP_LTE.values,
@@ -156,27 +155,29 @@ def predict_handover(UE_i_RSRP_LTE, UE_i_RSRP_5G, UE_i_HO, i):
     y_test = test['Executed']
 
     classifier = xgb.XGBClassifier(seed=seed, learning_rate=0.05, n_estimators = 500)
-    #classifier.get_params().keys().
+    #classifier.get_params().keys()
     
     # Hyperparameters
-    alphas = np.linspace(0,1,3)
-    lambdas = np.linspace(0,1,3)
+    alphas = np.linspace(0,1,2)
+    lambdas = np.linspace(0,1,2)
     depths = [6,8]
     sample_weights = [0.5, 0.7]
-    child_weights = [0, 1, 10]
+    child_weights = [0, 10]
     objectives = ['binary:logistic', 'reg:linear']
     
     hyperparameters = {'reg_alpha': alphas, 'reg_lambda': lambdas, 'objective': objectives, 'max_depth': depths, 
                        'colsample_bytree': sample_weights, 'min_child_weight': child_weights}
-      
-    try:
-        gs_xgb = GridSearchCV(classifier, hyperparameters, scoring='roc_auc', cv=k) # k-fold crossvalidation
-        gs_xgb.fit(X_train, y_train)
-        clf = gs_xgb.best_estimator_
-        y_pred = clf.predict(X_test)
+    #hyperparameters = {'objective': objectives}
 
-        y_score = clf.predict_proba(X_test)
+  
+    gs_xgb = GridSearchCV(classifier, hyperparameters, scoring='roc_auc', cv=k) # k-fold crossvalidation
+    gs_xgb.fit(X_train, y_train)
+    clf = gs_xgb.best_estimator_
+    y_pred = clf.predict(X_test)
+
+    y_score = clf.predict_proba(X_test)
     
+    try:
         # Compute area under ROC curve
         roc_auc = roc_auc_score(y_test, y_score[:,1])
         
@@ -205,7 +206,7 @@ def compute_power(d, tx=46, g=17, loss=3, f=2100):
     n = len(path_loss)
     return np.ones(n) * (tx + g - loss - 10*np.log10(NRB * 12)) - path_loss
 
-def compute_power_5g(d, tx=46, g=24, loss=3, f=(f_mmWave / 1e6)):
+def compute_power_5g(d, tx=46, g=24, loss=3, f=(f_mmWave / 1e6)): # need to find the proper URA antenna gain.
     NRB = 200
     # Distances in meters.
     path_loss = pathloss_5g(d, f, 1.5, 20)
@@ -298,45 +299,72 @@ for i in np.arange(n):
     fig = plt.figure(figsize=(7,3))
     plt.title(r'\textbf{UE \#' + '{}'.format(i) + r' Handover Executions}')
     plt.yticks(np.arange(0,1.01, 0.5))
-    plot_proposed, = plt.plot(np.arange(max_sim_time + 1), UE_i['HO_executed_proposed'], c='blue', lw=3)
-    plot_original, = plt.plot(np.arange(max_sim_time + 1), UE_i['HO_executed'], c='black', lw=0.5)
+    
+    plot_proposed, = plt.step(np.arange(max_sim_time + 1), UE_i['HO_executed_proposed'], c='blue', linestyle='-')
+    plot_original, = plt.step(np.arange(max_sim_time + 1), UE_i['HO_executed'], c='black', linestyle=':')
+    
+    plt.gca().set_yticks([0,1])
+    
     p = patches.Rectangle(
         (0, 0), N_training, 1.0,
         alpha=0.2, facecolor="black")
-    plt.plot(np.arange(max_sim_time + 1), UE_i['HO_executed'], c='black')
-    plt.legend([plot_proposed, plot_original], ['Baseline', 'Proposed'], loc='lower left')
+   # plt.plot(np.arange(max_sim_time + 1), UE_i['HO_executed'], c='black')
+    plt.legend([plot_proposed, plot_original], ['Proposed', 'Baseline'], loc='lower left')
     plt.gca().add_patch(p)
     
     plt.grid(True)
     plt.xlabel('Time (ms)')
     plt.ylabel('Decision')
-    plt.tight_layout()
+    fig.tight_layout()
     plt.savefig('figures/ue{}_decisions.pdf'.format(i), format='pdf')
-    plt.close(fig)
+    plt.show()
 
     fig = plt.figure(figsize=(7,3))
     plt.title(r'\textbf{UE \#' + '{}'.format(i) + r' Radio Measurements}')
+    
+# Burn out the first sample, since it represents d0 for the new 5G model
+#    plt.plot(1 + np.arange(max_sim_time), UE_i_RSRP_LTE[1:], c='black')
+#    plt.plot(1 + np.arange(max_sim_time), UE_i_RSRP_5G[1:], c='gray')
  
-    plt.plot(np.arange(max_sim_time + 1), UE_i_RSRP_LTE, c='black')
-    plt.plot(np.arange(max_sim_time + 1), UE_i_RSRP_5G, c='gray')
+    lte_plot, = plt.plot(np.arange(max_sim_time + 1), UE_i_RSRP_LTE, 'k--', label='Sub-6 GHz RSRP')
+    mmwave_plot, = plt.plot(np.arange(max_sim_time + 1), UE_i_RSRP_5G, c='gray', label='mmWave RSRP')
+ 
     plt.grid(True)
     plt.axhline(y=event_a2_measurement_gap, xmin=0, xmax=1, c="red", linewidth=1.5)
     plt.axhline(y=event_a1_measurement_gap, xmin=0, xmax=1, c="blue", linewidth=1.5)
     plt.axhline(y=RSRP_5G_min, xmin=0, xmax=1, c="green", linewidth=1.5)
     plt.xlabel('Time (ms)')
     plt.ylabel('RSRP (dBm)')
-    plt.tight_layout()
+    plt.legend(loc=1) # upper right
+    fig.tight_layout()
     plt.savefig('figures/ue{}_received_power.pdf'.format(i), format='pdf')
-    plt.close(fig)
+    plt.show()
     
 simulation_result = simulation_result.reset_index()
 simulation_result = simulation_result.drop(['index', 'UE#'], axis=1)
 
-file = open('output.txt', 'w')
+print('Original HO failures = {:0} out of {:1}'.format(simulation_result['Attempted'].sum() - simulation_result['Original'].sum(), simulation_result['Attempted'].sum()))
+print('Proposed HO failures = {:0} out of {:1}'.format(simulation_result['Attempted'].sum() - simulation_result['Proposed'].sum(), simulation_result['Attempted'].sum()))
+print('Original HO success rate = {:.6f}%'.format(100*simulation_result['Original'].sum()/simulation_result['Attempted'].sum()))
+print('Proposed HO success rate = {:.6f}%'.format(100*simulation_result['Proposed'].sum()/simulation_result['Attempted'].sum()))
 
-file.write('Original HO failures = {:0} out of {:1}'.format(simulation_result['Attempted'].sum() - simulation_result['Original'].sum(), simulation_result['Attempted'].sum()))
-file.write('Proposed HO failures = {:0} out of {:1}'.format(simulation_result['Attempted'].sum() - simulation_result['Proposed'].sum(), simulation_result['Attempted'].sum()))
-file.write('Original HO success rate = {:.6f}%'.format(100*simulation_result['Original'].sum()/simulation_result['Attempted'].sum()))
-file.write('Proposed HO success rate = {:.6f}%'.format(100*simulation_result['Proposed'].sum()/simulation_result['Attempted'].sum()))
 
-file.close()
+######################################################################################################
+# This is the true way to plot on the secondary Y axis.
+'''
+fig, ax1 = plt.subplots()
+ax2 = ax1.twinx()
+
+plt.title(r'\textbf{UE \#0 Radio Measurements (LTE)}')
+ax2.set_ylim(0,2)
+ax1.plot(np.arange(max_sim_time + 1), UE_0_RSRP,c='blue')
+ax2.plot(np.arange(max_sim_time + 1), UE_0_SINR,c='red')
+plt.grid(True)
+ax1.axhline(y=event_a2_measurement_gap, xmin=0, xmax=6, c="black", linewidth=1.5)
+plt.xlabel('Time')
+ax1.set_ylabel('RSRP (dBm)')
+ax2.set_ylabel('SINR (dB)')
+plt.savefig('figures/ue0_received_power.pdf', format='pdf')        
+plt.show()
+
+'''
