@@ -55,7 +55,7 @@ def cost231(distance, f=2.1e3, h_R=1.5, h_B=20):
 
     return L
 
-# From Path Loss Models for Millimeter-wave  distance-dependent large-scale propagation measurements and path loss models for outdoor and indoor 5G systems},'' April 2016.
+# From Path Loss Models for 5G Millimeter Wave Propagation Channels in Urban Microcells, 2013
 def pathloss_5g(distance, f=28e3, h_R=1.5, h_B=23):
     # These are the parameters for f = 28000 MHz.
     alpha = 118.77
